@@ -4,7 +4,7 @@ use std::collections::HashMap;
 #[derive(Default, Clone)]
 pub struct GenericChunk<T> {
     tiles: Array2<T>,
-    modified: Vec<[usize; 2]>
+    modified: Vec<[usize; 2]>,
 }
 
 impl<T: Default> GenericChunk<T> {
@@ -17,8 +17,9 @@ impl<T: Default> GenericChunk<T> {
 }
 
 impl<T> GenericChunk<T> {
-    pub fn indexed_tiles(&self) -> impl Iterator<Item=([usize; 2], &T)> {
-        self.tiles.indexed_iter()
+    pub fn indexed_tiles(&self) -> impl Iterator<Item = ([usize; 2], &T)> {
+        self.tiles
+            .indexed_iter()
             .map(|((x, y), tile)| ([x, y], tile))
     }
 
@@ -44,9 +45,7 @@ pub struct GenericTiles<C, T> {
 
 type C = i32;
 
-impl<T: Default> GenericTiles<i32, T>
-where
-{
+impl<T: Default> GenericTiles<i32, T> {
     pub fn new(chunk_size: usize) -> Self {
         GenericTiles {
             chunk_size,
@@ -55,7 +54,7 @@ where
         }
     }
 
-    pub fn indexed_chunks(&self) -> impl Iterator<Item=(&[C; 2], &GenericChunk<T>)> {
+    pub fn indexed_chunks(&self) -> impl Iterator<Item = (&[C; 2], &GenericChunk<T>)> {
         self.chunks.iter()
     }
 
@@ -82,8 +81,7 @@ where
 
     pub fn clear_modified(&mut self) {
         for chunk_coord in &self.modified {
-            self.chunks.get_mut(chunk_coord)
-                .map(|c| c.clear_modified());
+            self.chunks.get_mut(chunk_coord).map(|c| c.clear_modified());
         }
         self.modified.clear();
     }

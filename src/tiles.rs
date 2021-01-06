@@ -134,7 +134,7 @@ fn liquid_sync(
                     let [x, y] = liquid.tiles.combine_coord(chunk_coord, &point);
                     let [x, y] = [x as f32 * 16.0, y as f32 * 16.0];
 
-                    if tile.amount > 0.0 {
+                    if !tile.is_empty() {
                         cmd.spawn(SpriteBundle {
                             material: liquid.material.clone(),
                             ..Default::default()
@@ -214,8 +214,8 @@ fn tiles_editor(
         return;
     }
 
-    let pos = dbg!(mouse_pos.get_world() / 16.0);
-    let pos = dbg!([pos.x.round() as i32, pos.y.round() as i32]);
+    let pos = mouse_pos.get_world() / 16.0;
+    let pos = [pos.x.round() as i32, pos.y.round() as i32];
 
     if editor_state.liquid {
         for mut liquid in liquid.iter_mut() {

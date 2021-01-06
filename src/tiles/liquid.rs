@@ -4,26 +4,26 @@ use super::OptTileIndex;
 #[derive(Default, Clone)]
 pub struct LiquidTile {
     pub amount: f32,
-    flow: f32,
 }
 
 impl LiquidTile {
     pub fn new(amount: f32) -> Self {
-        LiquidTile {
-            amount,
-            flow: 0.0,
-        }
+        LiquidTile { amount }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.amount == 0.0
     }
 }
 
 impl GenericTiles<i32, LiquidTile> {
     pub fn step(&mut self, solid: &GenericTiles<i32, OptTileIndex>, t: f32) {
-        eprintln!("flow");
         let mut next = self.clone();
         next.clear_modified();
 
         self.deduplicate_modified();
         for chunk_coord in self.modified_chunks() {
+
             let chunk = &self.chunks()[chunk_coord];
             for &inner_coord in chunk.modified_tiles() {
                 let tile = &chunk.tiles()[inner_coord];
@@ -31,32 +31,55 @@ impl GenericTiles<i32, LiquidTile> {
                 let point = self.combine_coord(chunk_coord, &inner_coord);
                 let point_below = [point[0], point[1] - 1];
 
-                let max_outflow = tile.amount.min(t);
-                let mut max_inflow = self
-                    .get(&point_below)
-                    .map(|t| 1.0 - t.amount)
-                    .unwrap_or(0.0);
-                if solid
-                    .get(&point_below)
-                    .and_then(|t| t.get_index())
-                    .is_some()
-                {
-                    max_inflow = 0.0;
-                }
-                if max_outflow != 0.0 {
-                    dbg!(max_outflow);
-                }
-                if max_inflow != 0.0 {
-                    dbg!(max_inflow);
+                let amount = tile.amount;
+                let max_inflow_below = self.get_max_inflow(amount, solid, point_below);
+                let inflow_below = max_inflow_below.min(amount);
+
+                if inflow_below != 0.0 {
+                    next.get_or_create(&point).amount -= inflow_below;
+                    next.get_or_create(&point_below).amount += inflow_below;
                 }
 
-                let flow = max_inflow.min(max_outflow);
-                next.get_or_create(&point).amount -= flow;
-                next.get_or_create(&point_below).amount += flow;
+                if amount > inflow_below && amount > 0.1 {
+                    let amount = amount - inflow_below;
+                    let point_left = [point[0] - 1, point[1]];
+                    let point_right = [point[0] + 1, point[1]];
+
+                    let max_inflow_left = self.get_max_inflow(amount, solid, point_left);
+                    let max_inflow_right = self.get_max_inflow(amount, solid, point_right);
+                    let amount_lcr = max_inflow_left + max_inflow_right + amount;
+
+                    if max_inflow_left + max_inflow_right != 0.0 {
+                        let flow_left = amount * max_inflow_left / amount_lcr;
+                        let flow_right = amount * max_inflow_right / amount_lcr;
+
+                        next.get_or_create(&point).amount -= flow_left + flow_right;
+                        next.get_or_create(&point_left).amount += flow_left;
+                        next.get_or_create(&point_right).amount += flow_right;
+                    }
+                }
+
+                if next.get_or_create(&point).amount < 0.001 {
+                    next.get_or_create(&point).amount = 0.0;
+                }
             }
         }
 
         *self = next;
+    }
+
+    fn get_max_inflow(
+        &self,
+        current_amount: f32,
+        solid: &GenericTiles<i32, OptTileIndex>,
+        point: [i32; 2],
+    ) -> f32 {
+        if solid.get(&point).and_then(|t| t.get_index()).is_some() {
+            0.0
+        } else {
+            let amount = self.get(&point).map(|t| t.amount).unwrap_or(0.0);
+            (1.0 - amount).max((current_amount - amount) / 2.0).max(0.0)
+        }
     }
 }
 
