@@ -154,7 +154,7 @@ impl GenericTiles<i32, LiquidTile> {
             let mut total_outflow = 0.0;
             Direction::for_each_offset(coord, |offset_coord, dir| {
                 let flow_rate = total_flow_rate * (*dir.index_vec(&tile.velocity) / total_velocity);
-                let flow = flow_rate * t;
+                let flow = flow_rate;
                 if flow > 0.0 {
                     let target = self.get_or_create(&offset_coord);
                     target.amount += flow;
