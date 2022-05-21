@@ -1,5 +1,5 @@
-use bevy::prelude::*;
-use bevy_immediate::{ImmediateRenderRequest, ImmediateRenderObject};
+use bevy::{prelude::*, render::texture::DEFAULT_IMAGE_HANDLE};
+use bevy_immediate::{ImmediateRenderObject, ImmediateRenderRequest};
 
 use super::*;
 
@@ -21,16 +21,13 @@ pub fn tiles_sync<T: Tilemap + Component>(
     for tiles in tiles.iter_mut() {
         for (coord, tile) in tiles.storage().indexed_tiles() {
             if tile.needs_sprite() {
-                requests.send_batch(
-                    tiles.create_request(tile)
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, obj)| ImmediateRenderRequest {
-                            obj,
-                            z: i as f32 * 0.1,
-                            pos: IVec2::new(coord[0], coord[1]),
-                        })
-                );
+                requests.send_batch(tiles.create_request(tile).into_iter().enumerate().map(
+                    |(i, obj)| ImmediateRenderRequest {
+                        obj,
+                        z: i as f32 * 0.1,
+                        pos: IVec2::new(coord[0], coord[1]),
+                    },
+                ));
             }
         }
     }
@@ -60,9 +57,11 @@ impl Tilemap for SolidTiles {
     }
 
     fn create_request(&self, tile: &Self::Tile) -> Vec<ImmediateRenderObject> {
-        vec![
-            ImmediateRenderObject::SheetSprite { index: tile.get_index().unwrap() as usize, color: Color::WHITE, atlas: self.atlas.clone() }
-        ]
+        vec![ImmediateRenderObject::SheetSprite {
+            index: tile.get_index().unwrap() as usize,
+            color: Color::WHITE,
+            atlas: self.atlas.clone(),
+        }]
     }
 }
 
@@ -79,14 +78,19 @@ impl Tilemap for LiquidTiles {
 
     fn create_request(&self, tile: &Self::Tile) -> Vec<ImmediateRenderObject> {
         vec![
-            ImmediateRenderObject::Sprite { color: Color::WHITE, image: self.image.clone() },
+            ImmediateRenderObject::Sprite {
+                //color: Color::rgb((tile.velocity.x - tile.velocity.z), tile.velocity.y - tile.velocity.w, 0.0),
+                //image: DEFAULT_IMAGE_HANDLE.typed(),
+                color: Color::WHITE,
+                image: self.image.clone(),
+            },
             ImmediateRenderObject::Label(TextSection {
                 value: tile.to_string(),
                 style: TextStyle {
                     font: self.font.clone(),
                     font_size: 10.0,
                     color: Color::WHITE,
-                }
+                },
             }),
         ]
     }

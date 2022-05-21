@@ -62,14 +62,10 @@ impl<T: Default> GenericTiles<i32, T> {
         self.chunks
             .iter()
             .flat_map(|(chunk_coord, chunk)| {
-                chunk.indexed_tiles()
-                    .zip(std::iter::repeat(chunk_coord))
+                chunk.indexed_tiles().zip(std::iter::repeat(chunk_coord))
             })
             .map(move |((inner_coord, tile), chunk_coord)| {
-                (
-                    self.combine_coord(chunk_coord, &inner_coord),
-                    tile
-                )
+                (self.combine_coord(chunk_coord, &inner_coord), tile)
             })
     }
 
@@ -143,6 +139,13 @@ impl<T: Default> GenericTiles<i32, T> {
         let chunk_coord = self.point_to_chunk_coord(point);
         let inner_coord = self.point_to_inner_coord(point);
         self.chunks.get(&chunk_coord)?.tiles.get(inner_coord)
+    }
+
+    pub fn get_or_default(&self, point: &[C; 2]) -> T
+    where
+        T: Clone + Default,
+    {
+        self.get(point).cloned().unwrap_or_default()
     }
 
     pub fn get_mut(&mut self, point: &[C; 2]) -> Option<&mut T> {

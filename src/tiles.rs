@@ -83,9 +83,9 @@ fn liquid_sim(
         );
     }
 
-    if *enabled {
+    if *enabled || keys.just_pressed(KeyCode::S) {
         for (solid, mut liquid) in query.iter_mut() {
-            liquid.tiles.step(&solid.tiles, time.delta_seconds());
+            liquid.tiles.step(&solid.tiles, 0.1);
         }
     }
 }
@@ -107,13 +107,12 @@ impl Plugin for TilesPlugin {
             .add_system(sync::tiles_sync::<LiquidTiles>)
             .add_system(clear_modified_solid);
 
-        app
-            .insert_resource(bevy_immediate::ImmediateRenderSettings {
-                tile_size: Vec2::splat(16.0),
-                ..default()
-            })
-            .add_plugin(bevy_immediate::ImmediateRenderPlugin)
-            .add_stage("tiles", tiles_stage);
+        app.insert_resource(bevy_immediate::ImmediateRenderSettings {
+            tile_size: Vec2::splat(16.0),
+            ..default()
+        })
+        .add_plugin(bevy_immediate::ImmediateRenderPlugin)
+        .add_stage("tiles", tiles_stage);
     }
 }
 
@@ -152,9 +151,9 @@ fn tiles_editor(
         }
     }
 
-    if !mouse_keys.pressed(MouseButton::Left) && !mouse_keys.pressed(MouseButton::Right) {
-        return;
-    }
+    //if !mouse_keys.pressed(MouseButton::Left) && !mouse_keys.pressed(MouseButton::Right) {
+    //return;
+    //}
 
     let pos = mouse_pos.get_world() / 16.0;
     let pos = [pos.x.round() as i32, pos.y.round() as i32];
@@ -167,6 +166,9 @@ fn tiles_editor(
             }
             if mouse_keys.pressed(MouseButton::Right) {
                 *tile = LiquidTile::new(0.0);
+            }
+            if keys.pressed(KeyCode::M) {
+                *tile = LiquidTile::new(99.0);
             }
         }
     } else {
