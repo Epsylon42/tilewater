@@ -18,19 +18,13 @@ impl MousePos {
     }
 }
 
-#[derive(Default)]
-struct State {
-    cursor_moved_event_reader: EventReader<CursorMoved>,
-}
-
 fn mouse_position(
     mut mouse_pos: ResMut<MousePos>,
-    mut state: Local<State>,
-    cursor_moved_events: Res<Events<CursorMoved>>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
     windows: Res<Windows>,
     camera: Query<(&Camera, &GlobalTransform)>,
 ) {
-    for event in state.cursor_moved_event_reader.iter(&cursor_moved_events) {
+    for event in cursor_moved_events.iter() {
         mouse_pos.screen = event.position;
     }
 
@@ -53,8 +47,8 @@ fn mouse_position(
 pub struct MousePosPlugin;
 
 impl Plugin for MousePosPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_resource(MousePos::default())
-            .add_system(mouse_position.system());
+    fn build(&self, app: &mut App) {
+        app.insert_resource(MousePos::default())
+            .add_system(mouse_position);
     }
 }

@@ -58,6 +58,39 @@ impl<T: Default> GenericTiles<i32, T> {
         self.chunks.iter()
     }
 
+    pub fn indexed_tiles<'a>(&'a self) -> impl Iterator<Item = ([C; 2], &T)> + 'a {
+        self.chunks
+            .iter()
+            .flat_map(|(chunk_coord, chunk)| {
+                chunk.indexed_tiles()
+                    .zip(std::iter::repeat(chunk_coord))
+            })
+            .map(move |((inner_coord, tile), chunk_coord)| {
+                (
+                    self.combine_coord(chunk_coord, &inner_coord),
+                    tile
+                )
+            })
+    }
+
+    pub fn indexed_modified_tiles<'a>(&'a self) -> impl Iterator<Item = ([C; 2], &T)> + 'a {
+        self.modified_chunks()
+            .iter()
+            .map(move |chunk_coord| (chunk_coord, &self.chunks()[chunk_coord]))
+            .flat_map(|(chunk_coord, chunk)| {
+                chunk
+                    .modified_tiles()
+                    .iter()
+                    .zip(std::iter::repeat((chunk_coord, chunk)))
+            })
+            .map(move |(inner_coord, (chunk_coord, chunk))| {
+                (
+                    self.combine_coord(chunk_coord, inner_coord),
+                    &chunk.tiles()[*inner_coord],
+                )
+            })
+    }
+
     pub fn clear(&mut self) {
         self.chunks.clear();
         self.modified.clear();
@@ -104,7 +137,6 @@ impl<T: Default> GenericTiles<i32, T> {
         let chunk = self.get_chunk_or_create(chunk_coord);
         chunk.tiles[inner_coord] = tile;
         chunk.modified.push(inner_coord);
-        self.modified.push(chunk_coord);
     }
 
     pub fn get(&self, point: &[C; 2]) -> Option<&T> {
@@ -118,14 +150,12 @@ impl<T: Default> GenericTiles<i32, T> {
         let inner_coord = self.point_to_inner_coord(point);
         let chunk = self.chunks.get_mut(&chunk_coord)?;
         chunk.modified.push(inner_coord);
-        self.modified.push(chunk_coord);
         chunk.tiles.get_mut(inner_coord)
     }
 
     pub fn get_or_create(&mut self, point: &[C; 2]) -> &mut T {
         let chunk_coord = self.point_to_chunk_coord(point);
         let inner_coord = self.point_to_inner_coord(point);
-        self.modified.push(chunk_coord);
         let chunk = self.get_chunk_or_create(chunk_coord);
         chunk.modified.push(inner_coord);
         &mut chunk.tiles[inner_coord]

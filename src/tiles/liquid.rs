@@ -17,21 +17,22 @@ impl LiquidTile {
 }
 
 impl GenericTiles<i32, LiquidTile> {
-    pub fn step(&mut self, solid: &GenericTiles<i32, OptTileIndex>, t: f32) {
+    pub fn step(&mut self, solid: &GenericTiles<i32, OptTileIndex>, _t: f32) {
         let mut next = self.clone();
         next.clear_modified();
 
         self.deduplicate_modified();
-        for chunk_coord in self.modified_chunks() {
-
-            let chunk = &self.chunks()[chunk_coord];
-            for &inner_coord in chunk.modified_tiles() {
-                let tile = &chunk.tiles()[inner_coord];
-
+        for (chunk_coord, chunk) in self.indexed_chunks() {
+            for (inner_coord, tile) in chunk.indexed_tiles() {
                 let point = self.combine_coord(chunk_coord, &inner_coord);
                 let point_below = [point[0], point[1] - 1];
 
                 let amount = tile.amount;
+                if amount == 0.0 {
+                    continue;
+                }
+
+
                 let max_inflow_below = self.get_max_inflow(amount, solid, point_below);
                 let inflow_below = max_inflow_below.min(amount);
 
@@ -59,7 +60,7 @@ impl GenericTiles<i32, LiquidTile> {
                     }
                 }
 
-                if next.get_or_create(&point).amount < 0.001 {
+                if next.get(&point).unwrap().amount <= 0.01 {
                     next.get_or_create(&point).amount = 0.0;
                 }
             }
@@ -78,7 +79,12 @@ impl GenericTiles<i32, LiquidTile> {
             0.0
         } else {
             let amount = self.get(&point).map(|t| t.amount).unwrap_or(0.0);
-            (1.0 - amount).max((current_amount - amount) / 2.0).max(0.0)
+            let max_inflow = (1.0 - amount).max((current_amount - amount) / 2.0).max(0.0);
+            if max_inflow < 0.01 {
+                0.0
+            } else {
+                max_inflow
+            }
         }
     }
 }

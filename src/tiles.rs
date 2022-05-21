@@ -6,6 +6,7 @@ use crate::mouse::MousePos;
 
 mod generic_tiles;
 mod liquid;
+mod sync;
 
 use generic_tiles::*;
 use liquid::*;
@@ -27,14 +28,17 @@ impl OptTileIndex {
     }
 }
 
+#[derive(Component)]
 pub struct SolidTiles {
     pub tiles: GenericTiles<i32, OptTileIndex>,
     pub atlas: Handle<TextureAtlas>,
 }
 
+#[derive(Component)]
 pub struct LiquidTiles {
     pub tiles: GenericTiles<i32, LiquidTile>,
-    pub material: Handle<ColorMaterial>,
+    pub image: Handle<Image>,
+    pub font: Handle<Font>,
 }
 
 #[derive(Bundle)]
@@ -45,7 +49,11 @@ pub struct WorldTiles {
 }
 
 impl WorldTiles {
-    pub fn new(solid_atlas: Handle<TextureAtlas>, liquid_material: Handle<ColorMaterial>) -> Self {
+    pub fn new(
+        solid_atlas: Handle<TextureAtlas>,
+        liquid_material: Handle<Image>,
+        liquid_font: Handle<Font>,
+    ) -> Self {
         WorldTiles {
             solid: SolidTiles {
                 tiles: GenericTiles::new(16),
@@ -53,22 +61,10 @@ impl WorldTiles {
             },
             liquid: LiquidTiles {
                 tiles: GenericTiles::new(16),
-                material: liquid_material,
+                image: liquid_material,
+                font: liquid_font,
             },
             transform: Default::default(),
-        }
-    }
-}
-
-fn clean_old_tiles(
-    cmd: &mut Commands,
-    tiles: Query<Option<&Children>, Or<(With<SolidTiles>, With<LiquidTiles>)>>,
-) {
-    for children in tiles.iter() {
-        if let Some(children) = children {
-            for child in children.iter() {
-                cmd.despawn(*child);
-            }
         }
     }
 }
@@ -94,84 +90,30 @@ fn liquid_sim(
     }
 }
 
-fn solid_sync(cmd: &mut Commands, solid: Query<(Entity, &SolidTiles)>) {
-    for (this, solid) in solid.iter() {
-        cmd.set_current_entity(this);
-        cmd.with_children(|cmd| {
-            for (chunk_coord, chunk) in solid.tiles.indexed_chunks() {
-                for (inner_coord, tile) in chunk.indexed_tiles() {
-                    let [x, y] = solid.tiles.combine_coord(chunk_coord, &inner_coord);
-                    let [x, y] = [x as f32 * 16.0, y as f32 * 16.0];
-                    if let Some(index) = tile.get_index() {
-                        cmd.spawn(SpriteSheetBundle {
-                            sprite: TextureAtlasSprite {
-                                color: Color::WHITE,
-                                index,
-                            },
-                            global_transform: GlobalTransform::from_translation(Vec3::new(
-                                x, y, 0.0,
-                            )),
-                            texture_atlas: solid.atlas.clone(),
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
-        });
-    }
-}
-
-fn liquid_sync(
-    cmd: &mut Commands,
-    liquid: Query<(Entity, &LiquidTiles)>,
-    asset_server: Res<AssetServer>,
-) {
-    for (this, liquid) in liquid.iter() {
-        cmd.set_current_entity(this);
-        cmd.with_children(|cmd| {
-            for (chunk_coord, chunk) in liquid.tiles.indexed_chunks() {
-                for (point, tile) in chunk.indexed_tiles() {
-                    let [x, y] = liquid.tiles.combine_coord(chunk_coord, &point);
-                    let [x, y] = [x as f32 * 16.0, y as f32 * 16.0];
-
-                    if !tile.is_empty() {
-                        cmd.spawn(SpriteBundle {
-                            material: liquid.material.clone(),
-                            ..Default::default()
-                        })
-                        .with_bundle(Text2dBundle {
-                            text: Text {
-                                value: tile.to_string(),
-                                font: asset_server.load("font.ttf"),
-                                style: TextStyle {
-                                    font_size: 10.0,
-                                    color: Color::WHITE,
-                                    alignment: TextAlignment {
-                                        vertical: VerticalAlign::Center,
-                                        horizontal: HorizontalAlign::Center,
-                                    },
-                                },
-                            },
-                            global_transform: GlobalTransform::from_translation(Vec3::new(
-                                x, y, 0.0,
-                            )),
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
-        });
+fn clear_modified_solid(mut solid: Query<&mut SolidTiles>) {
+    for mut solid in solid.iter_mut() {
+        solid.tiles.clear_modified();
     }
 }
 
 pub struct TilesPlugin;
 
 impl Plugin for TilesPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_system(liquid_sim.system())
-            .add_system(clean_old_tiles.system())
-            .add_system(solid_sync.system())
-            .add_system(liquid_sync.system());
+    fn build(&self, app: &mut App) {
+        let mut tiles_stage = SystemStage::single_threaded();
+        tiles_stage
+            .add_system(liquid_sim)
+            .add_system(sync::tiles_sync::<SolidTiles>)
+            .add_system(sync::tiles_sync::<LiquidTiles>)
+            .add_system(clear_modified_solid);
+
+        app
+            .insert_resource(bevy_immediate::ImmediateRenderSettings {
+                tile_size: Vec2::splat(16.0),
+                ..default()
+            })
+            .add_plugin(bevy_immediate::ImmediateRenderPlugin)
+            .add_stage("tiles", tiles_stage);
     }
 }
 
@@ -243,7 +185,7 @@ fn tiles_editor(
 pub struct TilesEditorPlugin;
 
 impl Plugin for TilesEditorPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_system(tiles_editor.system());
+    fn build(&self, app: &mut App) {
+        app.add_system(tiles_editor);
     }
 }
